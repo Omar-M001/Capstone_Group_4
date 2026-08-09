@@ -46,8 +46,6 @@ The Sprint 1 user experience and visual layout were designed using a multi-wiref
 Before importing data into the SQLite database (`CCUA_Analytics.db`) and Power BI, initial data cleaning, binary status encoding, and schema transformations were executed in Python.
 
 ### Transformation Script
-![Python Data Cleaning Snapshot](sprint_1_Python_code.png)
-
 ```python
 import pandas as pd
 import sqlite3
