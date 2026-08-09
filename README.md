@@ -1,7 +1,7 @@
 # Capstone_Group_4
 # CCUA Credit Risk & Default Portfolio Analytics
 
-![CCUA Logo](CCUA_Logo.jpg)
+![CCUA Logo](CCUA-logo.png)
 
 ## 📌 Project Overview
 This repository contains the end-to-end data pipeline, analytical models, and dashboard implementations for the **Canadian Credit Union Association (CCUA)** Credit Risk Analysis Project. 
