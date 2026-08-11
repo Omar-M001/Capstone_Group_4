@@ -46,6 +46,7 @@ The Sprint 1 user experience and visual layout were designed using a multi-wiref
 Before importing data into the SQLite database (`CCUA_Analytics.db`) and Power BI, initial data cleaning, binary status encoding, and schema transformations were executed in Python.
 
 ### Transformation Script
+
 ```python
 import pandas as pd
 import sqlite3
@@ -54,7 +55,9 @@ import sqlite3
 df = pd.read_csv("raw_loan_data.csv")
 
 # Clean & encode binary loan status (1 = Default, 0 = Paid)
-df['loan_status_encoded'] = df['loan_status'].apply(lambda x: 1 if x in ['Default', 'Charged Off'] else 0)
+df['loan_status_encoded'] = df['loan_status'].apply(
+    lambda x: 1 if x in ['Default', 'Charged Off'] else 0
+)
 
 # Filter valid records & drop empty critical keys
 df_clean = df.dropna(subset=['Loan_ID', 'loan_amnt', 'purpose'])
@@ -65,9 +68,9 @@ df_clean.to_sql("Dim_Loan_Account", conn, if_exists="replace", index=False)
 conn.close()
 
 print("Data transformation complete. Database populated.")
+```
 
 ---
-
 
 # Sprint 2: Borrower Financial Stability & Risk Profiling
 
@@ -81,7 +84,7 @@ The wireframe was designed to explore how borrower employment tenure (`emp_lengt
 
 > **Objective:** Provide an executive-level view of borrower stability by examining employment tenure, homeownership distribution, and the interaction between these factors and loan default rates.
 
-![Sprint 2 - Borrower Financial Stability & Risk Profiling Wireframe](wireframes/Sprint_2/sprint2_borrower_risk_wireframe.png)
+![Sprint 2 - Borrower Financial Stability & Risk Profiling Wireframe](Wireframe_Sprint_2.png)
 
 - **Key Elements:**
   - **Top KPI Summary Row:** Highlights the Highest Risk Employment Segment (`< 1 year`), Unverified Employment Default Rate (`46.61%`), and Total Evaluated Applicants (`2.260668M`).
