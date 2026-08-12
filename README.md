@@ -93,7 +93,39 @@ The wireframe was designed to explore how borrower employment tenure (`emp_lengt
   - **Borrower Risk Matrix:** Heatmap matrix cross-tabulating `home_ownership` against `emp_length`, with conditional shading used to identify combinations associated with higher default rates.
 
 ---
+---
 
+## 🎨 Sprint 3 Design & Wireframes
+
+**Sprint 3 Focus:** Tracking longitudinal loan status transitions and repayment trends over time, segmented by loan purpose, region, and vintage year, to surface where repayment performance is deteriorating.
+
+### Wireframe 1: Loan Status Trend Overview
+
+> **Objective:** Present portfolio-wide KPIs and loan status movement (Current, Paid Off, Late, Default) over time to establish a baseline repayment trend.
+
+![Wireframe 1 - Loan Status Trend Overview](Sprint_3_01.png.png)
+
+- **Key Elements:** Top KPI summary row (Total Loans, Overall Repayment Rate, Current Default Trend, Avg Days to Repay), multi-line loan status trend chart (2019–2022), filters by loan purpose/region/year, and an insight callout flagging declining repayment in late-stage cohorts.
+
+---
+
+### Wireframe 2: Segment Breakdown (Drill-Down View)
+
+> **Objective:** Compare repayment trends across loan purposes and evaluate default concentration by purpose × tenor.
+
+![Wireframe 2 - Segment Breakdown](Sprint_3_02.png.png)
+
+- **Key Elements:** Side-by-side repayment trend charts for Debt Consolidation, Auto Loans, and Small Business segments, and a concentration matrix heatmap showing default rate by loan purpose crossed with tenor (12/24/36/48mo).
+
+---
+
+### Wireframe 3: Segment Detail (Interactive Flow)
+
+> **Objective:** Provide underwriting teams with granular, segment-specific repayment timelines and actionable risk mitigation steps.
+
+![Wireframe 3 - Segment Detail](Sprint_3_03.png.png)
+
+- **Key Elements:** Segment-specific repayment timeline (e.g., small business, 36mo tenor) with anomaly callouts (e.g., "Month 18 – late spike"), ranked contributing risk factors, and recommended action item cards.
 # Sprint 4: Debt-to-Income (DTI) & Credit Stress Analysis
 
 ## 🎨 Sprint 4 Design & Wireframes
