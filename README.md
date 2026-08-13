@@ -465,6 +465,227 @@ print(employment_inquiry_summary)
 
 ---
 
+## 🎨 Sprint 6 Design & Wireframes
+
+**Sprint 6 Focus:** Automated Underwriting Logic — determining which applications should be automatically rejected versus routed for manual underwriter review, based on a defined default-probability threshold.
+
+**Guiding Question:** Which applications should be automatically rejected versus routed for manual underwriter review?
+
+**Feature:** Decision Controller Logic (Threshold > 0.70 Auto-Reject Trigger).
+
+### Wireframe 1: Executive Decision Overview
+
+> **Objective:** Present top-level application decision KPIs and the overall flow of applications through the automated decision funnel.
+
+![Wireframe 1 - Executive Decision Overview](Sprint_6_01.png)
+
+- **Key Elements:** Top KPI summary row (Applications Processed, Auto-Approved %, Auto-Rejected %, Routed to Manual Review %), a decision funnel visualizing application flow from intake through final decision, a decision-mix sidebar, and a controller-rule callout.
+
+---
+
+### Wireframe 2: Threshold Control & Rule Matrix (Drill-Down View)
+
+> **Objective:** Let underwriting leadership see how the risk-score distribution splits against the decision threshold, and review/adjust the controller rules driving automation.
+
+![Wireframe 2 - Threshold Control & Rule Matrix](Sprint_6_02.png)
+
+- **Key Elements:** Risk-score histogram with the 0.70 threshold line overlaid, an editable decision-controller rule panel (auto-reject, manual review, auto-approve bands, override policy), and cross-filter slicers (Branch Region, Loan Purpose, Credit Grade, Decision Type).
+
+---
+
+### Wireframe 3: Application Decision Drawer (Interactive Flow)
+
+> **Objective:** Provide underwriters with the full decision trace for a single application, including which rule was triggered, so they can review or override the automated outcome.
+
+![Wireframe 3 - Application Decision Drawer](Sprint_6_03.png)
+
+- **Key Elements:** Application profile summary with triggered rule, a rule-evaluation trace table, an underwriter override panel (escalate, request documentation, confirm rejection), and an export-decision-log button.
+
+---
+
+## 🐍 Sprint 6 Data Pipeline (Python)
+
+Sprint 6 applies the decision controller logic to the scored loan population, classifying every application into Auto-Approve, Manual Review, or Auto-Reject based on the 0.70 threshold, and stages the results for the Power BI decision funnel and rule matrix.
+
+### Transformation Script
+
+```python
+import pandas as pd
+import sqlite3
+
+conn = sqlite3.connect("CCUA_Analytics.db")
+
+query = """
+SELECT
+    l.Loan_ID,
+    l.branch_id,
+    l.purpose,
+    l.grade,
+    r.risk_score
+FROM Dim_Loan_Account l
+JOIN Fact_Risk_Score r ON l.Loan_ID = r.Loan_ID
+"""
+df = pd.read_sql(query, conn)
+
+# Decision controller logic
+def decision(score):
+    if score > 0.70:
+        return "Auto-Reject"
+    elif score >= 0.40:
+        return "Manual Review"
+    else:
+        return "Auto-Approve"
+
+df["decision"] = df["risk_score"].apply(decision)
+df["rule_triggered"] = df["risk_score"].apply(
+    lambda s: "Score > 0.70" if s > 0.70 else ("Score 0.40-0.70" if s >= 0.40 else "Score < 0.40")
+)
+
+# Decision funnel summary
+decision_summary = (
+    df.groupby("decision")
+      .agg(loan_count=("Loan_ID", "count"))
+      .reset_index()
+)
+decision_summary["pct_of_total"] = (decision_summary["loan_count"] / len(df)).round(4)
+
+# Stage results for Power BI
+df.to_sql("Fact_Underwriting_Decisions", conn, if_exists="replace", index=False)
+decision_summary.to_sql("Fact_Decision_Summary", conn, if_exists="replace", index=False)
+
+conn.close()
+print("Underwriting decision tables staged for Power BI.")
+```
+
+### Supporting DAX Measures (Power BI)
+
+```DAX
+Auto_Reject_% =
+DIVIDE(
+    CALCULATE(COUNTROWS(Fact_Underwriting_Decisions), Fact_Underwriting_Decisions[decision] = "Auto-Reject"),
+    COUNTROWS(Fact_Underwriting_Decisions)
+)
+
+Manual_Review_% =
+DIVIDE(
+    CALCULATE(COUNTROWS(Fact_Underwriting_Decisions), Fact_Underwriting_Decisions[decision] = "Manual Review"),
+    COUNTROWS(Fact_Underwriting_Decisions)
+)
+```
+
+---
+
+## 🎨 Sprint 7 Design & Wireframes
+
+**Sprint 7 Focus:** Executive Portfolio Summary — quantifying CCUA's total financial risk exposure across all active loan applications for leadership reporting.
+
+**Guiding Question:** What is CCUA's total financial risk exposure across all active loan applications?
+
+**Feature:** High-Level Executive KPI Card Matrix & Portfolio Overview.
+
+### Wireframe 1: Executive KPI Card Matrix & Portfolio Overview
+
+> **Objective:** Give leadership an at-a-glance view of total portfolio exposure, application volume, average risk, and default rate, alongside the exposure trend over time.
+
+![Wireframe 1 - Executive KPI Card Matrix](Sprint_7_01.png)
+
+- **Key Elements:** Top KPI summary row (Total Risk Exposure, Active Applications, Avg Portfolio Risk Score, Overall Default Rate), a 12-month exposure and default-rate trend chart, an exposure-by-tier sidebar, and a portfolio-note callout.
+
+---
+
+### Wireframe 2: Portfolio Composition Breakdown (Drill-Down View)
+
+> **Objective:** Break down total exposure by risk tier and loan purpose so leadership can see where portfolio risk is concentrated.
+
+![Wireframe 2 - Portfolio Composition Breakdown](Sprint_7_02.png)
+
+- **Key Elements:** Exposure-by-risk-tier donut chart with legend, an exposure-by-loan-purpose bar chart, and portfolio filters (Region, Loan Purpose, Risk Tier, Origination Quarter).
+
+---
+
+### Wireframe 3: Executive Summary Export Drawer (Interactive Flow)
+
+> **Objective:** Let leadership generate a board-ready snapshot of the portfolio for a selected period, with configurable report detail.
+
+![Wireframe 3 - Executive Summary Export Drawer](Sprint_7_03.png)
+
+- **Key Elements:** Period-selected exposure trend, a top-5 risk-contributors table, report-option checkboxes (branch breakdown, demographic detail, board-ready formatting), and a generate-PDF-report button.
+
+---
+
+## 🐍 Sprint 7 Data Pipeline (Python)
+
+Sprint 7 aggregates the full scored loan population into portfolio-level exposure and risk metrics, split by tier and loan purpose, to power the executive KPI cards and composition breakdown in Power BI.
+
+### Transformation Script
+
+```python
+import pandas as pd
+import sqlite3
+
+conn = sqlite3.connect("CCUA_Analytics.db")
+
+query = """
+SELECT
+    l.Loan_ID,
+    l.loan_amnt,
+    l.purpose,
+    r.risk_score,
+    r.risk_tier
+FROM Dim_Loan_Account l
+JOIN Fact_Risk_Score r ON l.Loan_ID = r.Loan_ID
+"""
+df = pd.read_sql(query, conn)
+
+# Portfolio-level KPIs
+total_exposure = df["loan_amnt"].sum()
+avg_risk_score = df["risk_score"].mean()
+default_rate = (df["risk_score"] > 0.5).mean()  # proxy threshold for reporting
+
+portfolio_kpis = pd.DataFrame([{
+    "total_exposure": total_exposure,
+    "active_applications": len(df),
+    "avg_risk_score": round(avg_risk_score, 4),
+    "overall_default_rate": round(default_rate, 4),
+}])
+
+# Exposure by risk tier
+exposure_by_tier = (
+    df.groupby("risk_tier")
+      .agg(total_exposure=("loan_amnt", "sum"), loan_count=("Loan_ID", "count"))
+      .reset_index()
+)
+
+# Exposure by loan purpose
+exposure_by_purpose = (
+    df.groupby("purpose")
+      .agg(total_exposure=("loan_amnt", "sum"), loan_count=("Loan_ID", "count"))
+      .sort_values("total_exposure", ascending=False)
+      .reset_index()
+)
+
+# Stage results for Power BI
+portfolio_kpis.to_sql("Fact_Portfolio_KPIs", conn, if_exists="replace", index=False)
+exposure_by_tier.to_sql("Fact_Exposure_By_Tier", conn, if_exists="replace", index=False)
+exposure_by_purpose.to_sql("Fact_Exposure_By_Purpose", conn, if_exists="replace", index=False)
+
+conn.close()
+print("Portfolio summary tables staged for Power BI.")
+```
+
+### Supporting DAX Measures (Power BI)
+
+```DAX
+Total Risk Exposure =
+SUM(Dim_Loan_Account[loan_amnt])
+
+Overall Default Rate =
+DIVIDE(
+    CALCULATE(COUNTROWS(Fact_Risk_Score), Fact_Risk_Score[risk_score] > 0.5),
+    COUNTROWS(Fact_Risk_Score)
+)
+```
+
 ## 🎨 Sprint 8 Design & Wireframes
 
 **Sprint 8 Focus:** Regional Risk Concentration — identifying which regional credit union branches carry the highest concentration of High and Critical Risk loans, and giving underwriting leadership an interactive way to drill from a portfolio-wide view down to a single branch.
