@@ -464,3 +464,196 @@ print(employment_inquiry_summary)
 ```
 
 ---
+
+## 🎨 Sprint 8 Design & Wireframes
+
+**Sprint 8 Focus:** Regional Risk Concentration — identifying which regional credit union branches carry the highest concentration of High and Critical Risk loans, and giving underwriting leadership an interactive way to drill from a portfolio-wide view down to a single branch.
+
+**Guiding Question:** Which regional credit union branches carry the highest concentration of High and Critical Risk loans?
+
+**Feature:** Interactive Regional Heatmap & Branch Drill-Through Filter.
+
+### Wireframe 1: Executive Regional Overview
+
+> **Objective:** Present top-level regional risk KPIs and immediate risk concentration by branch location, so leadership can spot problem regions at a glance.
+
+![Wireframe 1 - Executive Regional Overview](Sprint_8_01.png)
+
+- **Key Elements:** Top KPI summary row (Active Branches, Avg Risk Score, Critical Risk Loans, High-Risk Concentration %), a regional map with risk-tier-coloured branch markers, and a ranked "Top 5 Branches by Risk" sidebar.
+
+---
+
+### Wireframe 2: Regional Heatmap Matrix (Drill-Down View)
+
+> **Objective:** Evaluate multi-dimensional risk cross-tabulating branch region against risk tier concentration.
+
+![Wireframe 2 - Regional Heatmap Matrix](Sprint_8_02.png)
+
+- **Key Elements:** Interactive heatmap grid (Region × Risk Tier), cross-category filter slicers, and concentration severity highlighting.
+
+---
+
+### Wireframe 3: Branch Detail Drawer (Interactive Flow)
+
+> **Objective:** Provide regional managers and underwriting teams with granular branch-level risk metrics and recommended action items.
+
+![Wireframe 3 - Branch Detail Drawer](Sprint_8_03.png)
+
+- **Key Elements:** Branch-specific trends, top Critical-risk loans table, and risk mitigation action panels.
+
+---
+
+## 🐍 Sprint 8 Data Pipeline (Python)
+
+Sprint 8 joins the scored loan population against branch/region reference data, aggregates risk tiers per branch, and computes concentration percentages that feed the regional heatmap in Power BI.
+
+### Transformation Script
+
+```python
+import pandas as pd
+import sqlite3
+
+conn = sqlite3.connect("CCUA_Analytics.db")
+
+# Pull scored loans joined against branch/region reference data
+query = """
+SELECT
+    l.Loan_ID,
+    l.branch_id,
+    b.branch_name,
+    b.region,
+    b.province,
+    r.risk_score,
+    r.risk_tier
+FROM Dim_Loan_Account l
+JOIN Dim_Branch b ON l.branch_id = b.branch_id
+JOIN Fact_Risk_Score r ON l.Loan_ID = r.Loan_ID
+"""
+df = pd.read_sql(query, conn)
+
+# Aggregate risk-tier counts per branch/region
+concentration = (
+    df.groupby(["region", "branch_name", "risk_tier"])
+      .agg(loan_count=("Loan_ID", "count"))
+      .reset_index()
+)
+
+# Compute % concentration of High + Critical within each branch
+branch_totals = df.groupby("branch_name")["Loan_ID"].count().rename("total_loans")
+high_crit = (
+    df[df["risk_tier"].isin(["High", "Critical"])]
+      .groupby("branch_name")["Loan_ID"].count()
+      .rename("high_critical_loans")
+)
+branch_summary = pd.concat([branch_totals, high_crit], axis=1).fillna(0)
+branch_summary["high_critical_pct"] = (
+    branch_summary["high_critical_loans"] / branch_summary["total_loans"]
+).round(4)
+
+# Stage results for the Power BI heatmap visual
+concentration.to_sql("Fact_Regional_Risk_Concentration", conn, if_exists="replace", index=False)
+branch_summary.reset_index().to_sql("Fact_Branch_Risk_Summary", conn, if_exists="replace", index=False)
+
+conn.close()
+print("Regional risk concentration tables staged for Power BI.")
+```
+
+---
+
+## 🎨 Sprint 9 Design & Wireframes
+
+**Sprint 9 Focus:** Borrower Demographic Analysis — understanding how applicant default risk correlates with loan purpose, employment length, and credit grade.
+
+**Guiding Question:** How does applicant default risk correlate with loan purpose, employment length, and credit grade?
+
+**Feature:** Multi-Attribute Scatter Plot & Demographic Slicer Panel.
+
+### Wireframe 1: Executive Demographic Overview
+
+> **Objective:** Present headline default-rate correlations across loan purpose, employment length, and credit grade.
+
+![Wireframe 1 - Executive Demographic Overview](Sprint_9_01.png)
+
+- **Key Elements:** Top KPI summary row (Avg Default Rate, Highest-Risk Purpose, Highest-Risk Grade, Median Employment Length), a DTI-vs-default-probability scatter plot coloured by credit grade, and a "Risk by Purpose" ranked sidebar.
+
+---
+
+### Wireframe 2: Multi-Attribute Scatter Matrix (Drill-Down View)
+
+> **Objective:** Evaluate multi-dimensional risk cross-tabulating loan purpose, employment length, and credit grade against default probability.
+
+![Wireframe 2 - Multi-Attribute Scatter Matrix](Sprint_9_02.png)
+
+- **Key Elements:** Interactive scatter plot with a configurable axis selector, a demographic slicer panel, and a correlation-coefficient callout.
+
+---
+
+### Wireframe 3: Applicant Detail Drawer (Interactive Flow)
+
+> **Objective:** Provide underwriting teams with granular applicant-level demographic and risk detail.
+
+![Wireframe 3 - Applicant Detail Drawer](Sprint_9_03.png)
+
+- **Key Elements:** Applicant profile summary, cohort-comparison chart, risk-tier badge, and underwriter routing recommendation.
+
+---
+
+## 🐍 Sprint 9 Data Pipeline (Python)
+
+Sprint 9 joins the scored loan population against demographic attributes, buckets continuous fields for slicer use, and computes correlation statistics that feed the scatter matrix and callouts.
+
+### Transformation Script
+
+```python
+import pandas as pd
+import sqlite3
+import numpy as np
+
+conn = sqlite3.connect("CCUA_Analytics.db")
+
+query = """
+SELECT
+    l.Loan_ID,
+    l.purpose,
+    l.emp_length,
+    l.grade,
+    l.dti,
+    r.risk_score,
+    r.risk_tier
+FROM Dim_Loan_Account l
+JOIN Fact_Risk_Score r ON l.Loan_ID = r.Loan_ID
+"""
+df = pd.read_sql(query, conn)
+
+# Bucket employment length for the demographic slicer panel
+bins = [-1, 1, 3, 5, 10, 100]
+labels = ["<1 yr", "1-3 yrs", "3-5 yrs", "5-10 yrs", "10+ yrs"]
+df["emp_length_bucket"] = pd.cut(df["emp_length"], bins=bins, labels=labels)
+
+# Default rate by purpose
+purpose_risk = (
+    df.groupby("purpose")
+      .agg(avg_default_prob=("risk_score", "mean"), loan_count=("Loan_ID", "count"))
+      .sort_values("avg_default_prob", ascending=False)
+      .reset_index()
+)
+
+# Default rate by employment length bucket x credit grade (for the scatter matrix)
+demo_matrix = (
+    df.groupby(["emp_length_bucket", "grade"], observed=True)
+      .agg(avg_default_prob=("risk_score", "mean"), loan_count=("Loan_ID", "count"))
+      .reset_index()
+)
+
+# Correlation coefficient: employment length vs. risk score
+correlation = np.corrcoef(df["emp_length"].fillna(0), df["risk_score"])[0, 1]
+print(f"Employment length vs. default probability correlation: r = {correlation:.2f}")
+
+# Stage results for Power BI
+df.to_sql("Fact_Borrower_Demographics", conn, if_exists="replace", index=False)
+purpose_risk.to_sql("Fact_Risk_By_Purpose", conn, if_exists="replace", index=False)
+demo_matrix.to_sql("Fact_Demographic_Risk_Matrix", conn, if_exists="replace", index=False)
+
+conn.close()
+print("Demographic correlation tables staged for Power BI.")
+```
